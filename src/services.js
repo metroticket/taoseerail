@@ -1,6 +1,6 @@
 // src/services.js 完整替換或修改 fetchPassengerFlow 函式
 
-const FLOW_GAS_URL = "https://script.google.com/macros/s/AKfycbx83C7UWPYe5ycOh-QzJdbYbChvtSo15L5QTPd0fWcP3E7X9OvV6IzQVSyv5s6EteHVpw/exec?action=flowSummary";
+const FLOW_GAS_URL = "https://script.google.com/macros/s/AKfycbzyvo8pE59kneyvd6DzO79QhFBhNAn6n9rD6ybQ90zJqAucESClHDfwzgYc8uShqnc/exec?action=flowSummary";
 const CACHE_KEY = "TYM_LOCAL_PASSENGER_FLOW";
 
 export async function fetchPassengerFlow(onCacheLoaded) {
