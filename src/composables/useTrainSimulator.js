@@ -5,8 +5,9 @@ import { fullDayTimetable } from '../timetable.js';
 
 export function useTrainSimulator() {
   function timeStrToSeconds(str) {
+    if (!str) return 0;
     const [h, m, s] = str.split(':').map(Number);
-    return h * 3600 + m * 60 + s;
+    return h * 3600 + m * 60 + (s || 0);
   }
 
   const getNowSeconds = () => {
@@ -19,15 +20,15 @@ export function useTrainSimulator() {
   const activeExpressCount = ref(0);
   const activeCommuterCount = ref(0);
 
-  let commuterLine = null;
-  let expressLine = null;
-  let commuterCoords = [];
-  let expressCoords = [];
-  let commuterTotalKm = 0;
-  let expressTotalKm = 0;
-  const stationDistanceMap = { commuter: {}, express: {} };
+  let southLine = null;
+  let northLine = null;
+  let southCoords = [];
+  let northCoords = [];
+  let southTotalKm = 0;
+  let northTotalKm = 0;
+  const stationDistanceMap = { south: {}, north: {} };
 
-  // 1. 初始化雙軌幾何
+  // 1. 初始化雙向複線幾何
   const buildSmoothDualTracks = () => {
     const line = turf.lineString(calibratedCoords);
     const simplified = turf.simplify(line, { tolerance: 0.00008, highQuality: true });
@@ -40,40 +41,54 @@ export function useTrainSimulator() {
     }
 
     const sampledLine = turf.lineString(samplePts);
-    const offsetExpress = turf.lineOffset(sampledLine, 0.015, { units: 'kilometers' });
-    const offsetCommuter = turf.lineOffset(sampledLine, -0.015, { units: 'kilometers' });
+    const offsetSouth = turf.lineOffset(sampledLine, 0.015, { units: 'kilometers' });
+    const offsetNorth = turf.lineOffset(sampledLine, -0.015, { units: 'kilometers' });
 
-    const ptA21 = turf.point(stations[20].coord);
-    const expressFullCoords = offsetExpress.geometry.coordinates;
-    let closestIdxA21 = 0;
-    let minDist = Infinity;
-    expressFullCoords.forEach((c, i) => {
-      const d = turf.distance(turf.point(c), ptA21);
-      if (d < minDist) {
-        minDist = d;
-        closestIdxA21 = i;
-      }
-    });
+    southCoords = offsetSouth.geometry.coordinates;
+    northCoords = offsetNorth.geometry.coordinates;
 
-    expressCoords = expressFullCoords.slice(0, closestIdxA21 + 1);
-    commuterCoords = offsetCommuter.geometry.coordinates;
-    commuterLine = turf.lineString(commuterCoords);
-    expressLine = turf.lineString(expressCoords);
-    commuterTotalKm = turf.length(commuterLine, { units: 'kilometers' });
-    expressTotalKm = turf.length(expressLine, { units: 'kilometers' });
+    southLine = turf.lineString(southCoords);
+    northLine = turf.lineString(northCoords);
+
+    southTotalKm = turf.length(southLine, { units: 'kilometers' });
+    northTotalKm = turf.length(northLine, { units: 'kilometers' });
 
     stations.forEach(s => {
       const pt = turf.point(s.coord);
-      stationDistanceMap.commuter[s.id] = turf.nearestPointOnLine(commuterLine, pt).properties.location;
-      if (s.express) {
-        stationDistanceMap.express[s.id] = turf.nearestPointOnLine(expressLine, pt).properties.location;
-      }
+      stationDistanceMap.south[s.id] = turf.nearestPointOnLine(southLine, pt).properties.location;
+      stationDistanceMap.north[s.id] = turf.nearestPointOnLine(northLine, pt).properties.location;
     });
   };
 
   buildSmoothDualTracks();
 
-  // 2. 啟動 SVG 動畫渲染迴圈
+  // ⭐ 效能優化：預先快取班表時間秒數，避免每幀重複執行字串 split 與 map
+  const cachedTimetable = fullDayTimetable.map(train => {
+    const stops = train.stops;
+    const firstStop = stops[0];
+    const lastStop = stops[stops.length - 1];
+    const startDepSec = timeStrToSeconds(firstStop.dep);
+    const readySec = startDepSec - 60;
+    const endArrSec = timeStrToSeconds(lastStop.arr);
+    const trainId = `${train.type}-${train.direction}-${firstStop.dep}-${train.terminalStation}`;
+
+    const parsedStops = stops.map(st => ({
+      ...st,
+      arrSec: timeStrToSeconds(st.arr),
+      depSec: timeStrToSeconds(st.dep)
+    }));
+
+    return {
+      ...train,
+      trainId,
+      startDepSec,
+      readySec,
+      endArrSec,
+      parsedStops
+    };
+  });
+
+  // 2. 啟動 SVG 動畫渲染
   const initTrainAnimation = (map, svgTrainsGroup) => {
     const svgTrainElements = new Map();
 
@@ -134,52 +149,46 @@ export function useTrainSimulator() {
       let activeExp = 0;
       let activeCom = 0;
 
-      fullDayTimetable.forEach(train => {
-        const stops = train.stops;
-        const firstStop = stops[0];
-        const lastStop = stops[stops.length - 1];
-        const trainId = `${train.type}-${train.direction}-${firstStop.dep}-${train.terminalStation}`;
+      for (let t = 0; t < cachedTimetable.length; t++) {
+        const train = cachedTimetable[t];
 
-        const startDepSec = timeStrToSeconds(firstStop.dep);
-        const readySec = startDepSec - 60;
-        const endArrSec = timeStrToSeconds(lastStop.arr);
-
-        const targetLine = train.type === 'express' ? expressLine : commuterLine;
-        const lineMaxKm = train.type === 'express' ? expressTotalKm : commuterTotalKm;
-        const distMap = train.type === 'express' ? stationDistanceMap.express : stationDistanceMap.commuter;
-
-        if (currentSec < readySec || currentSec > endArrSec) {
-          if (svgTrainElements.has(trainId)) {
-            svgTrainElements.get(trainId).g.remove();
-            svgTrainElements.delete(trainId);
+        if (currentSec < train.readySec || currentSec > train.endArrSec) {
+          if (svgTrainElements.has(train.trainId)) {
+            svgTrainElements.get(train.trainId).g.remove();
+            svgTrainElements.delete(train.trainId);
           }
-          return;
+          continue;
         }
 
         if (train.type === 'express') activeExp++;
         else activeCom++;
 
-        const trainItem = getOrCreateSvgTrain(trainId, train);
-        const firstDist = Math.max(0, Math.min(lineMaxKm, distMap[firstStop.stationId] ?? 0));
+        const trainItem = getOrCreateSvgTrain(train.trainId, train);
+        const isSouth = train.direction === 'south';
+        const targetLine = isSouth ? southLine : northLine;
+        const lineMaxKm = isSouth ? southTotalKm : northTotalKm;
+        const distMap = isSouth ? stationDistanceMap.south : stationDistanceMap.north;
+
+        const firstDist = Math.max(0, Math.min(lineMaxKm, distMap[train.parsedStops[0].stationId] ?? 0));
         const initialPt = turf.along(targetLine, firstDist, { units: 'kilometers' });
-        const offsetStep = train.direction === 'south' ? 0.05 : -0.05;
+        const offsetStep = isSouth ? 0.05 : -0.05;
         const prevPt = turf.along(targetLine, Math.max(0, Math.min(lineMaxKm, firstDist - offsetStep)), { units: 'kilometers' });
 
-        if (currentSec >= readySec && currentSec < startDepSec) {
+        if (currentSec >= train.readySec && currentSec < train.startDepSec) {
           trainItem.currentCoord = initialPt.geometry.coordinates;
           trainItem.prevCoord = prevPt ? prevPt.geometry.coordinates : initialPt.geometry.coordinates;
           trainItem.g.classList.add('waiting');
-          return;
+          continue;
         }
 
         trainItem.g.classList.remove('waiting');
 
+        const stops = train.parsedStops;
         for (let i = 0; i < stops.length; i++) {
           const curStop = stops[i];
-          const arrSec = timeStrToSeconds(curStop.arr);
-          const depSec = timeStrToSeconds(curStop.dep);
 
-          if (currentSec >= arrSec && currentSec <= depSec) {
+          // 停站狀態
+          if (currentSec >= curStop.arrSec && currentSec <= curStop.depSec) {
             const stopDist = Math.max(0, Math.min(lineMaxKm, distMap[curStop.stationId] ?? 0));
             const pt = turf.along(targetLine, stopDist, { units: 'kilometers' });
             const pPrev = turf.along(targetLine, Math.max(0, Math.min(lineMaxKm, stopDist - offsetStep)), { units: 'kilometers' });
@@ -187,30 +196,30 @@ export function useTrainSimulator() {
               trainItem.currentCoord = pt.geometry.coordinates;
               trainItem.prevCoord = pPrev ? pPrev.geometry.coordinates : pt.geometry.coordinates;
             }
-            return;
+            break;
           }
 
+          // 區間行駛狀態
           if (i < stops.length - 1) {
             const nextStop = stops[i + 1];
-            const segDep = timeStrToSeconds(curStop.dep);
-            const segArr = timeStrToSeconds(nextStop.arr);
-
-            if (currentSec > segDep && currentSec < segArr) {
-              const progress = (currentSec - segDep) / (segArr - segDep);
+            if (currentSec > curStop.depSec && currentSec < nextStop.arrSec) {
+              const progress = (currentSec - curStop.depSec) / (nextStop.arrSec - curStop.depSec);
               const dStart = distMap[curStop.stationId] ?? 0;
               const dEnd = distMap[nextStop.stationId] ?? 0;
               const curD = Math.max(0, Math.min(lineMaxKm, dStart + (dEnd - dStart) * progress));
+
               const pt = turf.along(targetLine, curD, { units: 'kilometers' });
               const pPrev = turf.along(targetLine, Math.max(0, Math.min(lineMaxKm, curD - offsetStep)), { units: 'kilometers' });
+
               if (pt?.geometry?.coordinates) {
                 trainItem.currentCoord = pt.geometry.coordinates;
                 trainItem.prevCoord = pPrev ? pPrev.geometry.coordinates : pt.geometry.coordinates;
               }
-              return;
+              break;
             }
           }
         }
-      });
+      }
 
       activeExpressCount.value = activeExp;
       activeCommuterCount.value = activeCom;
@@ -225,8 +234,8 @@ export function useTrainSimulator() {
   return {
     simSeconds,
     timeMultiplier,
-    commuterCoords,
-    expressCoords,
+    southCoords,
+    northCoords,
     activeExpressCount,
     activeCommuterCount,
     getNowSeconds,

@@ -5,6 +5,8 @@ html, body, #app {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .metro-container {
@@ -26,8 +28,10 @@ html, body, #app {
   z-index: 1;
 }
 
-#map .maplibregl-canvas-container canvas {
-  filter: grayscale(100%) brightness(108%) contrast(80%) opacity(0.85);
+/* 底圖 Canvas 效能優化 */
+#map .maplibregl-canvas-container canvas,
+#map .mapboxgl-canvas-container canvas {
+  will-change: transform;
 }
 
 /* ==================== 2. 頂層 SVG 雙軌與列車圖層 ==================== */
@@ -40,54 +44,86 @@ html, body, #app {
   pointer-events: none !important;
   z-index: 10;
   shape-rendering: geometricPrecision;
+  contain: paint;
+  will-change: transform;
 }
 
 #svg-track-layer path {
   pointer-events: none !important;
 }
 
+/* 南下軌道 (去程) */
 .track-glow-blue {
   fill: none;
-  stroke: #0284c7;
-  stroke-width: 8px;
-  stroke-opacity: 0.35;
+  stroke: #ac93c8;
+  stroke-width: 6px;
+  stroke-opacity: 0.25;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 .track-core-blue {
   fill: none;
-  stroke: #0284c7;
-  stroke-width: 3.5px;
+  stroke: #8c71ac;
+  stroke-width: 2.5px;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
+/* 北上軌道 (回程) */
 .track-glow-purple {
   fill: none;
-  stroke: #9333ea;
-  stroke-width: 8px;
-  stroke-opacity: 0.35;
+  stroke: #ac93c8;
+  stroke-width: 6px;
+  stroke-opacity: 0.25;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 .track-core-purple {
   fill: none;
-  stroke: #9333ea;
-  stroke-width: 3.5px;
+  stroke: #8c71ac;
+  stroke-width: 2.5px;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-/* 列車外觀樣式 */
+/* ==================== 桃園捷運綠線軌道樣式 ==================== */
+.track-glow-green {
+  fill: none !important;
+  stroke: #10b981;
+  stroke-width: 5.5px;
+  stroke-opacity: 0.28;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.track-core-green {
+  fill: none !important;
+  stroke: #059669;
+  stroke-width: 2.2px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.green-dashed {
+  stroke-dasharray: 7 4 !important;
+}
+
+.green-solid {
+  stroke-dasharray: none !important;
+}
+
+/* 列車外觀 */
 .svg-train { pointer-events: none; }
 .train-exp .train-halo {
-  fill: #c084fc; fill-opacity: 0.5; filter: drop-shadow(0 0 6px #9333ea);
+  fill: #c084fc;
+  fill-opacity: 0.6;
 }
 .train-exp .train-core { fill: #9333ea; stroke: #ffffff; stroke-width: 1.5px; }
 .train-exp .train-arrow { fill: #9333ea; stroke: #ffffff; stroke-width: 1px; }
 
 .train-com .train-halo {
-  fill: #38bdf8; fill-opacity: 0.5; filter: drop-shadow(0 0 6px #0284c7);
+  fill: #38bdf8;
+  fill-opacity: 0.6;
 }
 .train-com .train-core { fill: #0284c7; stroke: #ffffff; stroke-width: 1.5px; }
 .train-com .train-arrow { fill: #0284c7; stroke: #ffffff; stroke-width: 1px; }
@@ -110,11 +146,17 @@ html, body, #app {
   100% { r: 15px; fill-opacity: 0.8; }
 }
 
-/* ==================== 3. 車站圓點、避障引線與膠囊標籤 ==================== */
+/* ==================== 3. 機捷車站 Marker 與基準膠囊 ==================== */
+.maplibregl-marker {
+  will-change: transform !important;
+}
+
 .station-marker-container {
   position: absolute;
   pointer-events: none !important;
   z-index: 5;
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .station-dot {
@@ -126,7 +168,7 @@ html, body, #app {
   height: 8px;
   border-radius: 50%;
   background-color: #ffffff;
-  box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+  box-shadow: none !important;
   z-index: 6;
 }
 
@@ -142,280 +184,459 @@ html, body, #app {
 
 .leader-line {
   position: absolute;
-  background: rgba(148, 163, 184, 0.65) !important;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+  background: rgba(148, 163, 184, 0.8) !important;
+  box-shadow: none !important;
   pointer-events: none;
+  transition: all 0.25s ease;
 }
 
+/* ==================== 4. 中景基準（Zoom 13.0 ～ 14.5）：設定 15px ==================== */
 .station-flow-capsule {
   position: absolute;
-  background: rgba(15, 23, 42, 0.94);
-  backdrop-filter: blur(8px);
-  border: 1.5px solid rgba(255, 255, 255, 0.22);
-  border-radius: 20px;
-  padding: 3px 9px;
+  background: rgba(11, 20, 36, 0.94);
+  border: 1.5px solid rgba(56, 189, 248, 0.35);
+  border-radius: 8px;
+  padding: 6px 12px 7px 12px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 7px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  gap: 4px;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.58), 0 0 12px rgba(56, 189, 248, 0.16) !important;
   user-select: none;
   white-space: nowrap;
   pointer-events: auto !important;
   cursor: pointer;
-  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-rendering: geometricPrecision;
 }
 
 .station-flow-capsule:hover {
+  transform: scale(1.04);
   border-color: #38bdf8;
-  transform: scale(1.08) !important;
+  box-shadow: 0 7px 20px rgba(0, 0, 0, 0.7), 0 0 16px rgba(56, 189, 248, 0.35) !important;
   z-index: 80;
-}
-
-.st-name {
-  font-size: 12px;
-  font-weight: 800;
-  color: #f8fafc;
-  letter-spacing: 0.8px;
-}
-
-.st-live-count {
-  font-size: 11px;
-  font-weight: 800;
-  color: #38bdf8;
-  font-family: monospace;
-  letter-spacing: 0.5px;
-}
-
-.station-flow-capsule.high-density {
-  border-color: rgba(244, 63, 94, 0.6) !important;
-  box-shadow: 0 0 10px rgba(244, 63, 94, 0.4);
-}
-.station-flow-capsule.high-density .st-live-count {
-  color: #fb7185 !important;
-}
-
-/* ==================== 4. 車站微型懸停/鎖定卡片 (.station-hover-card) ==================== */
-.station-hover-card {
-  position: absolute;
-  min-width: 220px;
-  background: rgba(15, 23, 42, 0.96);
-  border: 1.5px solid rgba(56, 189, 248, 0.5);
-  backdrop-filter: blur(14px);
-  border-radius: 10px;
-  padding: 10px 14px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7);
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  pointer-events: none;
-  white-space: nowrap;
-  z-index: 100;
-}
-
-/* 懸停 (:hover) 或點擊鎖定 (.is-pinned) 時顯示 */
-.station-flow-capsule:hover .station-hover-card,
-.station-flow-capsule.is-pinned .station-hover-card {
-  opacity: 1 !important;
-  visibility: visible !important;
-  pointer-events: auto !important;
-}
-
-/* 手動按 ✕ 關閉時強制隱藏 */
-.station-flow-capsule.is-dismissed .station-hover-card {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
 }
 
 .station-flow-capsule.is-pinned {
   border-color: #38bdf8 !important;
-  box-shadow: 0 0 16px rgba(56, 189, 248, 0.8) !important;
-  z-index: 999 !important;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4), 0 7px 20px rgba(0, 0, 0, 0.6) !important;
+  z-index: 90;
 }
 
-.th-header-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  padding-bottom: 5px;
-  margin-bottom: 6px;
-}
 
-.th-title {
+/* 中景站名：15px */
+.st-name {
   font-size: 15px;
-  font-weight: 800;
-  color: #38bdf8;
-  margin: 0;
-  padding: 0;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.6px;
+  line-height: 1.2;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
-.th-close-btn {
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 0 4px;
+/* 中景數據群組 */
+.flow-pill-group {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   line-height: 1;
 }
-.th-close-btn:hover {
-  color: #f43f5e;
+
+.flow-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
 }
 
-.th-row {
-  font-size: 13px;
-  color: #cbd5e1;
-  font-family: monospace;
-  line-height: 1.6;
-}
-.th-row strong {
-  font-size: 15px;
-  font-weight: 800;
-  color: #ffffff;
-}
-.th-row small {
-  font-size: 11px;
+.flow-label {
+  font-size: 12.5px;
+  font-weight: 600;
   color: #94a3b8;
-  margin-left: 6px;
 }
 
-.th-action-row {
-  margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px dashed rgba(255, 255, 255, 0.1);
-  display: flex;
-  justify-content: flex-end;
-}
-
-.th-overview-btn {
-  background: rgba(56, 189, 248, 0.15);
-  border: 1px solid rgba(56, 189, 248, 0.4);
-  color: #38bdf8;
-  font-size: 11px;
+/* 中景核心數字：15px */
+.flow-val {
+  font-size: 15px;
   font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  color: #f8fafc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-.th-overview-btn:hover {
-  background: #38bdf8;
-  color: #0f172a;
+.flow-dot {
+  color: rgba(255, 255, 255, 0.28);
+  font-size: 14px;
+  user-select: none;
 }
 
-/* ==================== 5. 車站五向避障引線與卡片座標反推 ==================== */
+.flow-rate {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  margin-left: 1px;
+}
+
+.trend-up {
+  color: #f87171;
+}
+
+.trend-down {
+  color: #34d399;
+}
+
+/* ==================== 5. 車站五向避障引線與膠囊定位（中景基準） ==================== */
 .pos-top .leader-line {
   left: 50%;
   bottom: 0;
   width: 1px;
-  height: 38px;
+  height: 42px;
   transform: translateX(-50%);
 }
 .pos-top .station-flow-capsule {
   left: 50%;
-  bottom: 38px;
+  bottom: 42px;
   transform: translateX(-50%);
-}
-.pos-top .station-hover-card {
-  bottom: calc(100% + 12px);
-  left: 50%;
-  transform: translateX(-50%);
-}
-.pos-top .station-flow-capsule:hover .station-hover-card,
-.pos-top .station-flow-capsule.is-pinned .station-hover-card {
-  transform: translateX(-50%) translateY(-4px) !important;
 }
 
 .pos-bottom .leader-line {
   left: 50%;
   top: 0;
   width: 1px;
-  height: 38px;
+  height: 42px;
   transform: translateX(-50%);
 }
 .pos-bottom .station-flow-capsule {
   left: 50%;
-  top: 38px;
+  top: 42px;
   transform: translateX(-50%);
-}
-.pos-bottom .station-hover-card {
-  top: calc(100% + 12px);
-  left: 50%;
-  transform: translateX(-50%);
-}
-.pos-bottom .station-flow-capsule:hover .station-hover-card,
-.pos-bottom .station-flow-capsule.is-pinned .station-hover-card {
-  transform: translateX(-50%) translateY(4px) !important;
 }
 
 .pos-left .leader-line {
   top: 50%;
   right: 0;
   height: 1px;
-  width: 45px;
+  width: 50px;
   transform: translateY(-50%);
 }
 .pos-left .station-flow-capsule {
-  right: 45px;
+  right: 50px;
   top: 50%;
   transform: translateY(-50%);
-}
-.pos-left .station-hover-card {
-  right: calc(100% + 12px);
-  top: 50%;
-  transform: translateY(-50%);
-}
-.pos-left .station-flow-capsule:hover .station-hover-card,
-.pos-left .station-flow-capsule.is-pinned .station-hover-card {
-  transform: translateY(-50%) translateX(-4px) !important;
 }
 
 .pos-right .leader-line {
   top: 50%;
   left: 0;
   height: 1px;
-  width: 48px;
+  width: 52px;
   transform: translateY(-50%);
 }
 .pos-right .station-flow-capsule {
-  left: 48px;
+  left: 52px;
   top: 50%;
   transform: translateY(-50%);
-}
-.pos-right .station-hover-card {
-  left: calc(100% + 12px);
-  top: 50%;
-  transform: translateY(-50%);
-}
-.pos-right .station-flow-capsule:hover .station-hover-card,
-.pos-right .station-flow-capsule.is-pinned .station-hover-card {
-  transform: translateY(-50%) translateX(4px) !important;
 }
 
 .pos-top-left .leader-line {
   left: 50%;
   top: 50%;
   width: 1px;
-  height: 48px;
+  height: 50px;
   transform-origin: top center;
   transform: rotate(45deg);
 }
 .pos-top-left .station-flow-capsule {
-  right: 28px;
-  bottom: 28px;
+  right: 30px;
+  bottom: 30px;
   transform: translate(0, 0);
 }
-.pos-top-left .station-hover-card {
-  right: calc(100% + 12px);
+
+/* ==================== 6. 遠景 LOD 優化：純淨站名小藥丸（Zoom < 13.0） ==================== */
+#map.zoom-far .st-live-count {
+  display: none !important;
+}
+
+#map.zoom-far .station-flow-capsule {
+  padding: 3px 8px;
+  border-radius: 9999px;
+  background: rgba(11, 20, 36, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.38);
+  gap: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5) !important;
+}
+
+#map.zoom-far .st-name {
+  font-size: 12px; /* 遠景站名適當縮小，維持全景乾淨 */
+}
+
+#map.zoom-far .station-flow-capsule:hover {
+  border-color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.5) !important;
+  z-index: 100;
+}
+
+#map.zoom-far .pos-top .leader-line,
+#map.zoom-far .pos-bottom .leader-line {
+  height: 20px;
+}
+#map.zoom-far .pos-top .station-flow-capsule {
+  bottom: 20px;
+}
+#map.zoom-far .pos-bottom .station-flow-capsule {
+  top: 20px;
+}
+
+#map.zoom-far .pos-left .leader-line,
+#map.zoom-far .pos-right .leader-line {
+  width: 24px;
+}
+#map.zoom-far .pos-left .station-flow-capsule {
+  right: 24px;
+}
+#map.zoom-far .pos-right .station-flow-capsule {
+  left: 24px;
+}
+
+/* ==================== 7. 近景特寫：超清晰大面板（Zoom >= 14.5）：設定 20px ==================== */
+#map.zoom-close .station-flow-capsule {
+  padding: 9px 18px 10px 18px;
+  border-radius: 10px;
+  gap: 6px;
+  border-width: 2px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.75), 0 0 20px rgba(56, 189, 248, 0.28) !important;
+}
+
+/* 近景站名：放大至 20px */
+#map.zoom-close .st-name {
+  font-size: 20px;
+  letter-spacing: 0.9px;
+  line-height: 1.25;
+}
+
+/* 近景數據列間距舒展 */
+#map.zoom-close .flow-pill-group {
+  gap: 15px;
+}
+
+#map.zoom-close .flow-item {
+  gap: 6px;
+}
+
+#map.zoom-close .flow-label {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* 近景核心數字：放大至 20px，清晰易讀 */
+#map.zoom-close .flow-val {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+#map.zoom-close .flow-dot {
+  font-size: 18px;
+}
+
+#map.zoom-close .flow-rate {
+  font-size: 14px;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+/* 近景特寫引線加長，避免大面板遮擋軌道小圓點 */
+#map.zoom-close .pos-top .leader-line,
+#map.zoom-close .pos-bottom .leader-line {
+  height: 52px;
+}
+#map.zoom-close .pos-top .station-flow-capsule {
+  bottom: 52px;
+}
+#map.zoom-close .pos-bottom .station-flow-capsule {
+  top: 52px;
+}
+
+#map.zoom-close .pos-left .leader-line,
+#map.zoom-close .pos-right .leader-line {
+  width: 65px;
+}
+#map.zoom-close .pos-left .station-flow-capsule {
+  right: 65px;
+}
+#map.zoom-close .pos-right .station-flow-capsule {
+  left: 65px;
+}
+
+/* ==================== 8. 綠線車站標記與位移樣式 ==================== */
+/* ==================== 8. 綠線車站標記比照機捷質感與 LOD 階梯縮放 ==================== */
+/* 綠線小圓點 */
+.station-marker-container.green-station .dot-green {
+  width: 8px;
+  height: 8px;
+  background: #10b981 !important;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.9) !important;
+  border: 1.5px solid #ffffff;
+  border-radius: 50%;
+  position: absolute;
   top: 50%;
-  left: auto;
-  bottom: auto;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+
+/* 綠線引線（基準） */
+.station-marker-container.green-station .green-leader-line {
+  position: absolute;
+  background: rgba(16, 185, 129, 0.75);
+  box-shadow: none !important;
+  pointer-events: none;
+  z-index: 2;
+  transition: all 0.25s ease;
+}
+
+/* 綠線標籤膠囊本體（中景基準 13.0 ～ 14.5：字體 15px） */
+.station-marker-container.green-station .station-tag-green {
+  position: absolute;
+  background: rgba(6, 32, 24, 0.94);
+  border: 1.5px solid rgba(16, 185, 129, 0.45);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 15px; /* 中景 15px */
+  font-weight: 700;
+  color: #ecfdf5;
+  letter-spacing: 0.6px;
+  line-height: 1.2;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(16, 185, 129, 0.16);
+  user-select: none;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 4;
+  text-rendering: geometricPrecision;
+  transform: none !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+/* 綠線懸停：發光但不變形不跳動 */
+.station-marker-container.green-station .station-tag-green:hover {
+  border-color: #34d399;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.7), 0 0 14px rgba(16, 185, 129, 0.4);
+}
+
+/* ----------------- 中景引線與位移位移計算 (外推 22px) ----------------- */
+.station-marker-container.green-station.pos-right .station-tag-green {
+  left: 22px;
+  top: 50%;
+  transform: translateY(-50%) !important;
+}
+.station-marker-container.green-station.pos-right .green-leader-line {
+  left: 4px;
+  top: 50%;
+  width: 18px;
+  height: 1.5px;
   transform: translateY(-50%);
 }
-.pos-top-left .station-flow-capsule:hover .station-hover-card,
-.pos-top-left .station-flow-capsule.is-pinned .station-hover-card {
-  transform: translateY(-50%) translateX(-4px) !important;
+
+.station-marker-container.green-station.pos-left .station-tag-green {
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%) !important;
 }
+.station-marker-container.green-station.pos-left .green-leader-line {
+  right: 4px;
+  top: 50%;
+  width: 18px;
+  height: 1.5px;
+  transform: translateY(-50%);
+}
+
+.station-marker-container.green-station.pos-bottom .station-tag-green {
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%) !important;
+}
+.station-marker-container.green-station.pos-bottom .green-leader-line {
+  top: 4px;
+  left: 50%;
+  width: 1.5px;
+  height: 18px;
+  transform: translateX(-50%);
+}
+
+.station-marker-container.green-station.pos-top .station-tag-green {
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%) !important;
+}
+.station-marker-container.green-station.pos-top .green-leader-line {
+  bottom: 4px;
+  left: 50%;
+  width: 1.5px;
+  height: 18px;
+  transform: translateX(-50%);
+}
+
+.station-marker-container.green-station.pos-bottom-left .station-tag-green {
+  top: 18px;
+  right: 18px;
+}
+.station-marker-container.green-station.pos-bottom-left .green-leader-line {
+  top: 3px;
+  right: 3px;
+  width: 18px;
+  height: 1.5px;
+  transform: rotate(45deg);
+  transform-origin: top right;
+}
+
+/* ----------------- 遠景 LOD 優化：綠線極簡小藥丸（Zoom < 13.0） ----------------- */
+#map.zoom-far .station-marker-container.green-station .station-tag-green {
+  padding: 2px 7px;
+  border-radius: 9999px; /* 精緻藥丸形狀 */
+  font-size: 11px;       /* 縮小為 11px */
+  border-width: 1px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 縮短遠景引線，全線避障不打架 */
+#map.zoom-far .station-marker-container.green-station.pos-right .station-tag-green { left: 14px; }
+#map.zoom-far .station-marker-container.green-station.pos-right .green-leader-line { width: 10px; }
+
+#map.zoom-far .station-marker-container.green-station.pos-left .station-tag-green { right: 14px; }
+#map.zoom-far .station-marker-container.green-station.pos-left .green-leader-line { width: 10px; }
+
+#map.zoom-far .station-marker-container.green-station.pos-bottom .station-tag-green { top: 14px; }
+#map.zoom-far .station-marker-container.green-station.pos-bottom .green-leader-line { height: 10px; }
+
+#map.zoom-far .station-marker-container.green-station.pos-top .station-tag-green { bottom: 14px; }
+#map.zoom-far .station-marker-container.green-station.pos-top .green-leader-line { height: 10px; }
+
+#map.zoom-far .station-marker-container.green-station.pos-bottom-left .station-tag-green { top: 12px; right: 12px; }
+#map.zoom-far .station-marker-container.green-station.pos-bottom-left .green-leader-line { width: 11px; }
+
+/* ----------------- 近景 LOD 特寫：綠線清晰放大（Zoom >= 14.5） ----------------- */
+#map.zoom-close .station-marker-container.green-station .station-tag-green {
+  padding: 7px 16px;
+  border-radius: 10px;
+  font-size: 20px; /* 近景 20px 特寫 */
+  border-width: 2px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), 0 0 16px rgba(16, 185, 129, 0.28) !important;
+}
+
+/* 拉長近景引線，拉開空間 */
+#map.zoom-close .station-marker-container.green-station.pos-right .station-tag-green { left: 32px; }
+#map.zoom-close .station-marker-container.green-station.pos-right .green-leader-line { width: 28px; }
+
+#map.zoom-close .station-marker-container.green-station.pos-left .station-tag-green { right: 32px; }
+#map.zoom-close .station-marker-container.green-station.pos-left .green-leader-line { width: 28px; }
+
+#map.zoom-close .station-marker-container.green-station.pos-bottom .station-tag-green { top: 32px; }
+#map.zoom-close .station-marker-container.green-station.pos-bottom .green-leader-line { height: 28px; }
+
+#map.zoom-close .station-marker-container.green-station.pos-top .station-tag-green { bottom: 32px; }
+#map.zoom-close .station-marker-container.green-station.pos-top .green-leader-line { height: 28px; }
+
+#map.zoom-close .station-marker-container.green-station.pos-bottom-left .station-tag-green { top: 24px; right: 24px; }
+#map.zoom-close .station-marker-container.green-station.pos-bottom-left .green-leader-line { width: 24px; }

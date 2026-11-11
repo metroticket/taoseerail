@@ -543,3 +543,11 @@ export const calibratedCoords = [
   [121.21969, 24.9602],
   [121.21921, 24.95822]
 ];
+
+
+
+export const stationOffsets = {
+  A1: 'top', A2: 'top-left', A3: 'bottom', A4: 'top', A5: 'left', A6: 'right', A7: 'right',
+  A8: 'left', A9: 'top', A10: 'top', A11: 'top', A12: 'top-left', A13: 'right', A14a: 'left',
+  A15: 'right', A16: 'right', A17: 'right', A18: 'right', A19: 'left', A20: 'right', A21: 'left', A22: 'bottom'
+};
