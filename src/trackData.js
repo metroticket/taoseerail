@@ -1,6 +1,6 @@
 // src/trackData.js
 
-// 桃園捷運 22 站點固定精確座標
+// 桃園捷運 23 站點固定精確座標 (含 A14 機場第三航廈)
 export const stations = [
   { id: "A1", name: "A1 台北車站", coord: [121.5143, 25.04873], express: true },
   { id: "A2", name: "A2 三重", coord: [121.48273, 25.05480], express: false },
@@ -15,6 +15,7 @@ export const stations = [
   { id: "A11", name: "A11 坑口", coord: [121.26651, 25.08639], express: false },
   { id: "A12", name: "A12 機場第一航廈", coord: [121.23832, 25.0807], express: true },
   { id: "A13", name: "A13 機場第二航廈", coord: [121.23213, 25.07735], express: true },
+  { id: "A14", name: "A14 機場第三航廈", coord: [121.22719, 25.07322], express: true },
   { id: "A14a", name: "A14a 機場旅館", coord: [121.2208, 25.06939], express: false },
   { id: "A15", name: "A15 大園", coord: [121.2105, 25.05609], express: false },
   { id: "A16", name: "A16 橫山", coord: [121.21571, 25.03663], express: false },
@@ -26,7 +27,7 @@ export const stations = [
   { id: "A22", name: "A22 老街溪", coord: [121.21938, 24.95842], express: false }
 ];
 
-// 原始 233 點高精度中心線
+// 原始高精度中心線 (已補入 A14 座標節點)
 export const calibratedCoords = [
   [121.51428, 25.04869],
   [121.5135, 25.04889],
@@ -444,6 +445,7 @@ export const calibratedCoords = [
   [121.23132, 25.07653],
   [121.23062, 25.07598],
   [121.22842, 25.07422],
+  [121.22719, 25.07322],
   [121.22529, 25.07178],
   [121.22458, 25.07134],
   [121.22327, 25.07112],
@@ -544,10 +546,8 @@ export const calibratedCoords = [
   [121.21921, 24.95822]
 ];
 
-
-
 export const stationOffsets = {
   A1: 'top', A2: 'top-left', A3: 'bottom', A4: 'top', A5: 'left', A6: 'right', A7: 'right',
-  A8: 'left', A9: 'top', A10: 'top', A11: 'top', A12: 'top-left', A13: 'right', A14a: 'left',
+  A8: 'left', A9: 'top', A10: 'top', A11: 'top', A12: 'top-left', A13: 'right', A14: 'right', A14a: 'left',
   A15: 'right', A16: 'right', A17: 'right', A18: 'right', A19: 'left', A20: 'right', A21: 'left', A22: 'bottom'
 };
